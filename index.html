@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Hill Game Smooth</title>
+  <title>Hill Game Final Boss</title>
   <style>
-    body { margin:0; overflow:hidden; background:#1e293b; }
+    body { margin:0; overflow:hidden; background:#0f172a; }
     canvas { display:block; }
   </style>
 </head>
@@ -18,109 +18,155 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// Game variables
-let gravity = 0.6;
-let speed = 4;
-let coins = 0;
+// GAME VARIABLES
+let gravity = 0.5;
+let speed = 3;
 
+let level = 1;
+let phase = 1;
+let coins = 0;
+let progress = 0;
+
+// CAR
 let car = {
-  x: canvas.width / 4,
-  y: canvas.height - 150,
-  width: 60,
-  height: 30,
+  x: 200,
+  y: 0,
+  width: 80,
+  height: 40,
   dy: 0,
-  jumpPower: -12
+  angle: 0,
+  angularVelocity: 0
 };
 
-let coinArray = [];
+// TERRAIN
+let terrain = [];
+let offset = 0;
 
-// Spawn coin (controlled)
-function spawnCoin() {
-  if (coinArray.length < 15) { // LIMIT FIX 🔥
-    coinArray.push({
-      x: canvas.width,
-      y: Math.random() * 200 + 100,
-      r: 10
-    });
+// GENERATE TERRAIN
+function generateTerrain() {
+  terrain = [];
+  let x = 0;
+
+  while(x < 5000){
+    let y = Math.sin(x * 0.01) * 50 + canvas.height - 200;
+    terrain.push({x, y});
+    x += 20;
   }
 }
 
-// Draw car
-function drawCar() {
-  ctx.fillStyle = "red";
-  ctx.fillRect(car.x, car.y, car.width, car.height);
-
-  // wheels
-  ctx.fillStyle = "black";
+// DRAW TERRAIN
+function drawTerrain() {
   ctx.beginPath();
-  ctx.arc(car.x+10, car.y+30, 8, 0, Math.PI*2);
-  ctx.arc(car.x+50, car.y+30, 8, 0, Math.PI*2);
+  ctx.moveTo(0, canvas.height);
+
+  terrain.forEach(p => {
+    ctx.lineTo(p.x - offset, p.y);
+  });
+
+  ctx.lineTo(canvas.width, canvas.height);
+  ctx.fillStyle = "#22c55e";
   ctx.fill();
 }
 
-// Draw coins
-function drawCoins() {
-  ctx.fillStyle = "gold";
-  coinArray.forEach(c => {
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, c.r, 0, Math.PI*2);
-    ctx.fill();
-  });
+// GET GROUND HEIGHT
+function getGroundY(x){
+  let index = Math.floor((x + offset) / 20);
+  if(terrain[index]) return terrain[index].y;
+  return canvas.height;
 }
 
-// Update game
-function update() {
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+// UPDATE
+let keys = {};
 
-  // Background
-  ctx.fillStyle = "#1e293b";
-  ctx.fillRect(0,0,canvas.width,canvas.height);
+document.addEventListener("keydown", e=>{
+  keys[e.code] = true;
 
-  // Gravity
-  car.dy += gravity;
-  car.y += car.dy;
-
-  if (car.y > canvas.height - 150) {
-    car.y = canvas.height - 150;
-    car.dy = 0;
-  }
-
-  // Move coins
-  coinArray.forEach(c => c.x -= speed);
-
-  // REMOVE off-screen coins (MAIN FREEZE FIX 🔥)
-  coinArray = coinArray.filter(c => c.x > -50);
-
-  // Collect coins
-  coinArray.forEach((c, i) => {
-    if (Math.abs(car.x - c.x) < 40 && Math.abs(car.y - c.y) < 40) {
-      coins++;
-      coinArray.splice(i, 1);
-    }
-  });
-
-  drawCar();
-  drawCoins();
-
-  // UI
-  ctx.fillStyle = "white";
-  ctx.font = "20px Arial";
-  ctx.fillText("Coins: " + coins, 20, 40);
-
-  requestAnimationFrame(update); // SINGLE LOOP ✅
-}
-
-// Controls
-document.addEventListener("keydown", e => {
-  if (e.code === "Space") {
-    car.dy = car.jumpPower;
+  if(e.code==="Space"){
+    car.dy = -10;
   }
 });
 
-// Controlled spawn (NO OVERLOAD)
-setInterval(spawnCoin, 1200);
+document.addEventListener("keyup", e=>{
+  keys[e.code] = false;
+});
 
-// Start
+function update(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // CAMERA MOVE
+  offset += speed;
+
+  // GRAVITY
+  car.dy += gravity;
+  car.y += car.dy;
+
+  let groundY = getGroundY(car.x);
+
+  // COLLISION WITH GROUND
+  if(car.y > groundY - car.height){
+    car.y = groundY - car.height;
+    car.dy = 0;
+    car.angularVelocity *= 0.7;
+  }
+
+  // ROTATION
+  if(keys["ArrowRight"]) car.angularVelocity += 0.002;
+  if(keys["ArrowLeft"]) car.angularVelocity -= 0.002;
+
+  car.angle += car.angularVelocity;
+  car.angularVelocity *= 0.99;
+
+  // PROGRESS
+  progress += 0.2;
+  if(progress >= 100){
+    progress = 0;
+    level++;
+    speed += 0.3;
+
+    if(level > 10){
+      level = 1;
+      phase++;
+      speed += 1;
+      alert("🔥 Phase " + phase + " Unlocked!");
+    }
+  }
+
+  // DRAW
+  drawTerrain();
+
+  // DRAW CAR
+  ctx.save();
+  ctx.translate(car.x, car.y);
+  ctx.rotate(car.angle);
+
+  ctx.fillStyle = "red";
+  ctx.fillRect(-40, -20, 80, 40);
+
+  ctx.fillStyle = "black";
+  ctx.beginPath();
+  ctx.arc(-20, 20, 10, 0, Math.PI*2);
+  ctx.arc(20, 20, 10, 0, Math.PI*2);
+  ctx.fill();
+
+  ctx.restore();
+
+  // UI
+  ctx.fillStyle="white";
+  ctx.fillText("Coins: "+coins,20,30);
+  ctx.fillText("Level: "+level,20,50);
+  ctx.fillText("Phase: "+phase,20,70);
+
+  // Progress bar
+  ctx.fillStyle="white";
+  ctx.fillRect(20,90,200,10);
+  ctx.fillStyle="lime";
+  ctx.fillRect(20,90,progress*2,10);
+
+  requestAnimationFrame(update);
+}
+
+// START
+generateTerrain();
 update();
 </script>
 
